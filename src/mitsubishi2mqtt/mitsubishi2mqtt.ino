@@ -46,6 +46,7 @@ ESP8266WebServer server(80);  // ESP8266 web
 #include "html_menu.h"    // code html for menu
 #include "html_pages.h"   // code html for pages
 #include "html_metrics.h" // prometheus metrics
+#include "functions_labels.h" // names for installer function codes
 // Languages
 #ifndef MY_LANGUAGE
   #include "languages/en-GB.h" // default language English
@@ -82,6 +83,7 @@ unsigned long lastRemoteTemp;
 
 //Local state
 StaticJsonDocument<JSON_OBJECT_SIZE(12)> rootInfo;
+bool remoteSensorResetDone = false; // internal-sensor mode sends one disable packet per boot
 
 //Web OTA
 int uploaderror = 0;
@@ -135,6 +137,7 @@ void setup() {
     server.on("/unit", handleUnit);
     server.on("/status", handleStatus);
     server.on("/others", handleOthers);
+    server.on("/functions", handleFunctions);
     server.on("/metrics", handleMetrics);
     server.onNotFound(handleNotFound);
     if (login_password.length() > 0) {
@@ -200,6 +203,7 @@ void setup() {
     rootInfo["mode"]                = hpGetMode(currentSettings);
     rootInfo["action"]              = hpGetAction(currentStatus, currentSettings);
     rootInfo["compressorFrequency"] = currentStatus.compressorFrequency;
+    rootInfo["remoteTempActive"]    = remoteTempActive;
     lastTempSend = millis();
   }
   else {
@@ -304,7 +308,7 @@ bool loadUnit() {
   std::unique_ptr<char[]> buf(new char[size]);
 
   configFile.readBytes(buf.get(), size);
-  const size_t capacity = JSON_OBJECT_SIZE(3) + 200;
+  const size_t capacity = JSON_OBJECT_SIZE(7) + 256;
   DynamicJsonDocument doc(capacity);
   deserializeJson(doc, buf.get());
   //unit
@@ -316,6 +320,9 @@ bool loadUnit() {
   //mode
   String supportMode = doc["support_mode"].as<String>();
   if (supportMode == "nht") supportHeatMode = false;
+  //room temperature sensor, default remote (accept MQTT feed) for existing installs
+  String sensor = doc["sensor"].as<String>();
+  if (sensor == "internal") useRemoteSensor = false;
   //prevent login password is "null" if not exist key
   if (doc.containsKey("login_password")) {
     login_password = doc["login_password"].as<String>();
@@ -384,8 +391,8 @@ void saveMqtt(String mqttFn, String mqttHost, String mqttPort, String mqttUser,
   configFile.close();
 }
 
-void saveUnit(String tempUnit, String supportMode, String loginPassword, String minTemp, String maxTemp, String tempStep) {
-  const size_t capacity = JSON_OBJECT_SIZE(6) + 200;
+void saveUnit(String tempUnit, String supportMode, String loginPassword, String minTemp, String maxTemp, String tempStep, String sensor) {
+  const size_t capacity = JSON_OBJECT_SIZE(7) + 256;
   DynamicJsonDocument doc(capacity);
   // if temp unit is empty, we use default celcius
   if (tempUnit.isEmpty()) tempUnit = "cel";
@@ -402,6 +409,9 @@ void saveUnit(String tempUnit, String supportMode, String loginPassword, String 
   // if support mode is empty, we use default all mode
   if (supportMode.isEmpty()) supportMode = "all";
   doc["support_mode"]   = supportMode;
+  // if sensor is empty, we use default remote
+  if (sensor.isEmpty()) sensor = "remote";
+  doc["sensor"]   = sensor;
   // if login password is empty, we use empty
   if (loginPassword.isEmpty()) loginPassword = "";
 
@@ -658,6 +668,7 @@ void handleSetup() {
     menuSetupPage.replace("_TXT_WIFI_",FPSTR(txt_WIFI));
     menuSetupPage.replace("_TXT_UNIT_",FPSTR(txt_unit));
     menuSetupPage.replace("_TXT_OTHERS_",FPSTR(txt_others));
+    menuSetupPage.replace("_TXT_FUNCTIONS_",FPSTR(txt_functions));
     menuSetupPage.replace("_TXT_RESET_",FPSTR(txt_reset));
     menuSetupPage.replace("_TXT_BACK_",FPSTR(txt_back));
     menuSetupPage.replace("_TXT_RESETCONFIRM_",FPSTR(txt_reset_confirm));
@@ -749,7 +760,7 @@ void handleUnit() {
   if (!checkLogin()) return;
 
   if (server.method() == HTTP_POST) {
-    saveUnit(server.arg("tu"), server.arg("md"), server.arg("lpw"), (String)convertLocalUnitToCelsius(server.arg("min_temp").toFloat(), useFahrenheit), (String)convertLocalUnitToCelsius(server.arg("max_temp").toFloat(), useFahrenheit), server.arg("temp_step"));
+    saveUnit(server.arg("tu"), server.arg("md"), server.arg("lpw"), (String)convertLocalUnitToCelsius(server.arg("min_temp").toFloat(), useFahrenheit), (String)convertLocalUnitToCelsius(server.arg("max_temp").toFloat(), useFahrenheit), server.arg("temp_step"), server.arg("rs"));
     rebootAndSendPage();
   }
   else {
@@ -767,6 +778,9 @@ void handleUnit() {
     unitPage.replace("_TXT_F_FH_", FPSTR(txt_f_fh));
     unitPage.replace("_TXT_F_ALLMODES_", FPSTR(txt_f_allmodes));
     unitPage.replace("_TXT_F_NOHEAT_", FPSTR(txt_f_noheat));
+    unitPage.replace("_TXT_UNIT_SENSOR_", FPSTR(txt_unit_sensor));
+    unitPage.replace("_TXT_F_REMOTE_", FPSTR(txt_f_remote));
+    unitPage.replace("_TXT_F_INTERNAL_", FPSTR(txt_f_internal));
     unitPage.replace(F("_MIN_TEMP_"), String(convertCelsiusToLocalUnit(min_temp, useFahrenheit)));
     unitPage.replace(F("_MAX_TEMP_"), String(convertCelsiusToLocalUnit(max_temp, useFahrenheit)));
     unitPage.replace(F("_TEMP_STEP_"), String(temp_step));
@@ -776,6 +790,9 @@ void handleUnit() {
     //mode
     if (supportHeatMode) unitPage.replace(F("_MD_ALL_"), F("selected"));
     else unitPage.replace(F("_MD_NONHEAT_"), F("selected"));
+    //room temperature sensor
+    if (useRemoteSensor) unitPage.replace(F("_RS_REM_"), F("selected"));
+    else unitPage.replace(F("_RS_INT_"), F("selected"));
     unitPage.replace(F("_LOGIN_PASSWORD_"), login_password);
     sendWrappedHTML(unitPage);
   }
@@ -826,6 +843,7 @@ void handleStatus() {
   statusPage.replace("_TXT_STATUS_MQTT_", FPSTR(txt_status_mqtt));
   statusPage.replace("_TXT_STATUS_WIFI_", FPSTR(txt_status_wifi));
   statusPage.replace("_TXT_RETRIES_HVAC_", FPSTR(txt_retries_hvac));
+  statusPage.replace("_TXT_STATUS_SENSOR_", FPSTR(txt_status_sensor));
 
   if (server.hasArg("mrconn")) mqttConnect();
 
@@ -844,6 +862,18 @@ void handleStatus() {
   statusPage.replace(F("_HVAC_RETRIES_"), String(hpConnectionTotalRetries));
   statusPage.replace(F("_MQTT_REASON_"), String(mqtt_client.state()));
   statusPage.replace(F("_WIFI_STATUS_"), String(WiFi.RSSI()));
+  String sensorStatus;
+  if (remoteTempActive) {
+    sensorStatus = FPSTR(txt_f_remote);
+    sensorStatus += F(" (");
+    sensorStatus += FPSTR(txt_status_lastfeed);
+    sensorStatus += F(" ");
+    sensorStatus += String((millis() - lastRemoteTemp) / 1000);
+    sensorStatus += F(" s)");
+  } else {
+    sensorStatus = FPSTR(txt_f_internal);
+  }
+  statusPage.replace(F("_SENSOR_STATUS_"), sensorStatus);
   sendWrappedHTML(statusPage);
 }
 
@@ -996,6 +1026,96 @@ void handleControl() {
   // Signal the end of the content
   server.sendContent("");
   //delay(100);
+}
+
+// Renders the indoor unit installer functions (codes 101-128) as a read-only
+// table. Reads fresh from the unit on every request and never writes.
+String functionsTable(heatpumpFunctions &functions) {
+  String table = F("<table style='width:100%'><tr><th>");
+  table += FPSTR(txt_fn_code);
+  table += F("</th><th>");
+  table += FPSTR(txt_fn_name);
+  table += F("</th><th>");
+  table += FPSTR(txt_fn_value);
+  table += F("</th></tr>");
+
+  heatpumpFunctionCodes codes = functions.getAllCodes();
+  bool anyValue = false;
+  for (int i = 0; i < MAX_FUNCTION_CODE_COUNT; ++i) {
+    if (!codes.valid[i]) continue;
+    int code = codes.code[i];
+    int value = functions.getValue(code);
+    if (value > 0) anyValue = true;
+    const char* name = functionName(code);
+    const char* option = functionOption(code, value);
+
+    table += F("<tr><td>");
+    table += String(code);
+    table += F("</td><td>");
+    if (name != nullptr) {
+      table += FPSTR(name);
+    } else {
+      table += F("Function ");
+      table += String(code);
+    }
+    table += F("</td><td>");
+    table += String(value);
+    if (strlen_P(option) > 0) {
+      table += F(" - ");
+      table += FPSTR(option);
+    }
+    table += F("</td></tr>");
+  }
+  table += F("</table>");
+  if (!anyValue) {
+    table += F("<p><i>");
+    table += FPSTR(txt_fn_no_values);
+    table += F("</i></p>");
+  }
+
+  // Raw bytes of both function packets, for diagnosing units the manual does not cover.
+  byte raw[MAX_FUNCTION_CODE_COUNT];
+  functions.getData1(raw);
+  functions.getData2(raw + 15);
+  table += F("<p><b>");
+  table += FPSTR(txt_fn_raw);
+  table += F("</b><br/><code>");
+  for (int i = 0; i < MAX_FUNCTION_CODE_COUNT; ++i) {
+    if (i == 15) table += F("<br/>");
+    if (raw[i] < 16) table += F("0");
+    table += String(raw[i], HEX);
+    table += F(" ");
+  }
+  table += F("</code></p>");
+  return table;
+}
+
+void handleFunctions() {
+  if (!checkLogin()) return;
+
+  String functionsPage = FPSTR(html_page_functions);
+  functionsPage.replace(F("_TXT_FUNCTIONS_TITLE_"), FPSTR(txt_functions_title));
+  functionsPage.replace(F("_TXT_BACK_"), FPSTR(txt_back));
+
+  String body;
+  if (!hp.isConnected()) {
+    body = F("<p>");
+    body += FPSTR(txt_fn_not_connected);
+    body += F("</p>");
+  } else {
+    heatpumpFunctions functions = hp.getFunctions();
+    if (!functions.isValid()) {
+      body = F("<p>");
+      body += FPSTR(txt_fn_read_failed);
+      body += F("</p><p><a class='button' href='/functions'>");
+      body += FPSTR(txt_fn_retry);
+      body += F("</a></p>");
+    } else {
+      body = functionsTable(functions);
+    }
+  }
+  functionsPage.replace(F("_FUNCTIONS_BODY_"), body);
+  sendWrappedHTML(functionsPage);
 }
 
 void handleMetrics(){
@@ -1384,6 +1504,7 @@ void hpStatusChanged(heatpumpStatus currentStatus) {
     rootInfo["mode"]                = hpGetMode(currentSettings);
     rootInfo["action"]              = hpGetAction(currentStatus, currentSettings);
     rootInfo["compressorFrequency"] = currentStatus.compressorFrequency;
+    rootInfo["remoteTempActive"]    = remoteTempActive;
     String mqttOutput;
     serializeJson(rootInfo, mqttOutput);
 
@@ -1529,6 +1650,10 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     hp.setWideVaneSetting(message);
   }
   else if (strcmp(topic, ha_remote_temp_set_topic.c_str()) == 0) {
+    if (!useRemoteSensor) { //Unit is configured to use its internal sensor, ignore the feed
+      if (_debugModeLogs) mqtt_client.publish(ha_debug_logs_topic.c_str(), (char*)("Ignoring remote_temp, internal sensor selected"));
+      return;
+    }
     float temperature = strtof(message, NULL);
     if (temperature == 0){ //Remote temp disabled by mqtt topic set
       remoteTempActive = false; //clear the remote temp flag
@@ -1910,6 +2035,13 @@ void loop() {
       }
     } else {
         hpConnectionRetries = 0;
+        if (!useRemoteSensor && !remoteSensorResetDone) {
+          // Internal sensor selected: clear any remote temperature a previous
+          // controller (for example an MHK1) left active in the unit.
+          hp.setRemoteTemperature(0.0);
+          remoteTempActive = false;
+          remoteSensorResetDone = true;
+        }
         hp.sync();
     }
 

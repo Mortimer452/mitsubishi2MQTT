@@ -138,3 +138,22 @@ const char txt_upload_refresh[] PROGMEM = "Refresh in";
 const char txt_init_title[] PROGMEM = "Setup iniziale";
 const char txt_init_reboot_mes[] PROGMEM = "Riavvio e connessione alla tua rete WiFi! Dovresti vederlo nella lista del tuo Access Point.";
 const char txt_init_reboot[] PROGMEM = "Riavvio...";
+
+//Page Functions
+const char txt_functions[] PROGMEM = "Functions";
+const char txt_functions_title[] PROGMEM = "Installer functions (read only)";
+const char txt_fn_code[] PROGMEM = "Code";
+const char txt_fn_name[] PROGMEM = "Function";
+const char txt_fn_value[] PROGMEM = "Value";
+const char txt_fn_raw[] PROGMEM = "Raw data";
+const char txt_fn_not_connected[] PROGMEM = "HVAC unit is not connected";
+const char txt_fn_read_failed[] PROGMEM = "Reading functions from the HVAC unit failed";
+const char txt_fn_retry[] PROGMEM = "Retry";
+const char txt_fn_no_values[] PROGMEM = "This unit reports no installer functions over CN105. On models that do, unavailable functions show as 0.";
+
+//Room temperature sensor
+const char txt_unit_sensor[] PROGMEM = "Room temperature sensor";
+const char txt_f_remote[] PROGMEM = "Remote sensor via MQTT";
+const char txt_f_internal[] PROGMEM = "Internal sensor";
+const char txt_status_sensor[] PROGMEM = "Room temperature source";
+const char txt_status_lastfeed[] PROGMEM = "last update";

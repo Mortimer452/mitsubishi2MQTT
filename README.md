@@ -9,6 +9,7 @@ Features:
  - Homeassistant autodiscovery and control with MQTT
  - Control with MQTT
  - Multilanguages
+ - Read-only view of the indoor unit installer function settings (codes 101-128, Setup -> Functions)
 
 Screenshots:
 
@@ -36,11 +37,12 @@ For nodered fans MQTT topic use cases
 - topic/mode/set AUTO HEAT COOL DRY FAN_ONLY OFF ON
 - topic/temp/set 16-31
 - topic/remote_temp/set also called "room_temp", the implementation defined in "HeatPump" seems not work in some models
+  - Ignored when the Unit page's "Room temperature sensor" is set to Internal sensor. In that mode the firmware also resets the unit to its own sensor at every boot, which clears a remote value left behind by a previous controller such as an MHK1.
 - topic/fan/set 1-4 AUTO QUIET
 - topic/vane/set 1-5 SWING AUTO
 - topic/wideVane/set << < | > >>
 - topic/settings
-- topic/state
+- topic/state (JSON; includes remoteTempActive true/false showing whether the unit is currently using a remote temperature)
 - topic/debug/packets
 - topic/debug/packets/set on off
 - topic/debug/logs

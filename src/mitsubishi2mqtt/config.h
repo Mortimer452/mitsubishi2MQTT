@@ -109,5 +109,8 @@ const PROGMEM uint32_t HP_MAX_RETRIES = 10; // Double the interval between retri
 
 // temp settings
 bool useFahrenheit = false;
+// room temperature sensor: true = accept remote temperature over MQTT (remote_temp/set),
+// false = always use the unit's internal sensor and reset it at boot
+bool useRemoteSensor = true;
 // support heat mode settings, some model do not support heat mode
 bool supportHeatMode = true;
