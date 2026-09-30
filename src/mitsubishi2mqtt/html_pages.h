@@ -385,6 +385,7 @@ const char html_page_upgrade[] PROGMEM =
     "<div id='f1' style='display:block;'>"
         "<fieldset>"
             "<legend><b>&nbsp; _TXT_UPGRADE_TITLE_ &nbsp;</b></legend>"
+            "<p><b>_TXT_UPGRADE_BUILD_</b><br/>_BUILD_NAME_ (_VERSION_)</p>"
             "<form method='post' action='upload' enctype='multipart/form-data'>"
                 "<p><span>_TXT_UPGRADE_INFO_</span></p>"
                 "<br>"

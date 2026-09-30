@@ -120,6 +120,7 @@ const char txt_login_fail[] PROGMEM = "Wrong username/password! Try again.";
 const char txt_upgrade_title[] PROGMEM = "Upgrade";
 const char txt_upgrade_info[] PROGMEM = "Firmware OTA upgrade by bin file upload";
 const char txt_upgrade_start[] PROGMEM = "Upload started";
+const char txt_upgrade_build[] PROGMEM = "Current firmware";
 
 //Page Upload
 const char txt_upload_nofile[] PROGMEM = "No file selected";

@@ -119,6 +119,7 @@ const char txt_login_fail[] PROGMEM = "Mauvais mot de passe! Essayer à nouveau.
 const char txt_upgrade_title[] PROGMEM = "Mise à jour";
 const char txt_upgrade_info[] PROGMEM = "Mise à jour par envoi d'un fichier bin";
 const char txt_upgrade_start[] PROGMEM = "Mise à jour lancée";
+const char txt_upgrade_build[] PROGMEM = "Current firmware";
 
 //Page Upload
 const char txt_upload_nofile[] PROGMEM = "Pas de fichier sélectionné";

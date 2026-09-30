@@ -48,13 +48,21 @@ ESP8266WebServer server(80);  // ESP8266 web
 #include "html_metrics.h" // prometheus metrics
 #include "functions_labels.h" // names for installer function codes
 // Languages
+#define QUOTEME(x) QUOTEME_1(x)
+#define QUOTEME_1(x) #x
 #ifndef MY_LANGUAGE
   #include "languages/en-GB.h" // default language English
 #else
-  #define QUOTEME(x) QUOTEME_1(x)
-  #define QUOTEME_1(x) #x
   #define INCLUDE_FILE(x) QUOTEME(languages/x.h)
   #include INCLUDE_FILE(MY_LANGUAGE)
+#endif
+// Name of the firmware binary this build produces, set by prebuild.py from
+// platformio.ini's binary_name. Shown on the upgrade page so you can tell
+// which file a unit expects. Arduino IDE builds have no name.
+#ifdef PIO_BINARY
+  #define BUILD_NAME QUOTEME(PIO_BINARY)
+#else
+  #define BUILD_NAME "unknown (not a PlatformIO build)"
 #endif
 
 // wifi, mqtt and heatpump client instances
@@ -1409,6 +1417,8 @@ void handleUpgrade() {
   upgradePage.replace("_TXT_UPGRADE_TITLE_",FPSTR(txt_upgrade_title));
   upgradePage.replace("_TXT_UPGRADE_INFO_",FPSTR(txt_upgrade_info));
   upgradePage.replace("_TXT_UPGRADE_START_",FPSTR(txt_upgrade_start));
+  upgradePage.replace("_TXT_UPGRADE_BUILD_",FPSTR(txt_upgrade_build));
+  upgradePage.replace("_BUILD_NAME_", F(BUILD_NAME));
 
   sendWrappedHTML(upgradePage);
 }
@@ -1552,12 +1562,18 @@ heatpumpSettings change_states(heatpumpSettings settings) {
   }
   else {
     bool update = false;
+    // Keep the argument Strings alive until setSettings() has used the pointers.
+    // ESP32's WebServer::arg() returns a temporary String, so taking c_str()
+    // of it directly leaves a dangling pointer (ESP8266 returns a reference).
+    String powerArg, modeArg, fanArg, vaneArg, wideVaneArg;
     if (server.hasArg("POWER")) {
-      settings.power = server.arg("POWER").c_str();
+      powerArg = server.arg("POWER");
+      settings.power = powerArg.c_str();
       update = true;
     }
     if (server.hasArg("MODE")) {
-      settings.mode = server.arg("MODE").c_str();
+      modeArg = server.arg("MODE");
+      settings.mode = modeArg.c_str();
       update = true;
     }
     if (server.hasArg("TEMP")) {
@@ -1565,15 +1581,18 @@ heatpumpSettings change_states(heatpumpSettings settings) {
       update = true;
     }
     if (server.hasArg("FAN")) {
-      settings.fan = server.arg("FAN").c_str();
+      fanArg = server.arg("FAN");
+      settings.fan = fanArg.c_str();
       update = true;
     }
     if (server.hasArg("VANE")) {
-      settings.vane = server.arg("VANE").c_str();
+      vaneArg = server.arg("VANE");
+      settings.vane = vaneArg.c_str();
       update = true;
     }
     if (server.hasArg("WIDEVANE")) {
-      settings.wideVane = server.arg("WIDEVANE").c_str();
+      wideVaneArg = server.arg("WIDEVANE");
+      settings.wideVane = wideVaneArg.c_str();
       update = true;
     }
     if (update) {
@@ -1717,7 +1736,16 @@ void hpPacketDebug(byte* packet, unsigned int length, const char* packetDirectio
     root[packetDirection] = message;
     String mqttOutput;
     serializeJson(root, mqttOutput);
-    if (!mqtt_client.publish(ha_debug_pckts_topic.c_str(), mqttOutput.c_str())) {
+    // Publish under <debug/packets>/<direction>/<type> so a subscriber can
+    // follow one packet type over time. Byte 5 is the type in framed packets;
+    // custom packets are user data without the frame so they get no type.
+    String topic = ha_debug_pckts_topic + "/" + packetDirection;
+    if (length > 5 && strcmp(packetDirection, "customPacket") != 0) {
+      topic += "/";
+      if (packet[5] < 16) topic += "0";
+      topic += String(packet[5], HEX);
+    }
+    if (!mqtt_client.publish(topic.c_str(), mqttOutput.c_str())) {
       mqtt_client.publish(ha_debug_logs_topic.c_str(), (char*)("Failed to publish to heatpump/debug topic"));
     }
   }

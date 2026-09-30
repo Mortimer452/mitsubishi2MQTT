@@ -120,6 +120,7 @@ const char txt_login_fail[] PROGMEM = "错误的账户/密码! 请重试.";
 const char txt_upgrade_title[] PROGMEM = "升级";
 const char txt_upgrade_info[] PROGMEM = "通过上传的bin文件进行固件OTA升级";
 const char txt_upgrade_start[] PROGMEM = "开始上传";
+const char txt_upgrade_build[] PROGMEM = "Current firmware";
 
 //Page Upload
 const char txt_upload_nofile[] PROGMEM = "未选中文件";

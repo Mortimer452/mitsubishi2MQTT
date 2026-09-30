@@ -120,6 +120,7 @@ const char txt_login_fail[] PROGMEM = "¡Usuario contraseña invalidos! Intental
 const char txt_upgrade_title[] PROGMEM = "Actualización";
 const char txt_upgrade_info[] PROGMEM = "Actualizar Firmware OTA mediante subida de fichero bin";
 const char txt_upgrade_start[] PROGMEM = "Actualización iniciada";
+const char txt_upgrade_build[] PROGMEM = "Current firmware";
 
 //Page Upload
 const char txt_upload_nofile[] PROGMEM = "Ningun fichero bin selecionado";

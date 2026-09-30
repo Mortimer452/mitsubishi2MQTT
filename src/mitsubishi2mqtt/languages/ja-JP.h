@@ -120,6 +120,7 @@ const char txt_login_fail[] PROGMEM = "ユーザー名・パスワードが間�
 const char txt_upgrade_title[] PROGMEM = "ファームウェア更新";
 const char txt_upgrade_info[] PROGMEM = "binファイルをアップロードし、ファームウェアのOTAアップデートを行う";
 const char txt_upgrade_start[] PROGMEM = "アップロード中";
+const char txt_upgrade_build[] PROGMEM = "Current firmware";
 
 //Page Upload
 const char txt_upload_nofile[] PROGMEM = "ファイルが選択されていません";
