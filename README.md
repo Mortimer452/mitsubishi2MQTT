@@ -32,6 +32,24 @@ How to use:
 Nightly builds are available for select platforms via GitHub Actions. Go to [the platformio workflow](https://github.com/gysmo38/mitsubishi2MQTT/actions/workflows/platformio.yml), select the latest build, then check the **Artifacts** section. 
 
 ***
+# Installer function settings
+Setup -> Functions reads the indoor unit's installer function settings over CN105 and, on units that expose them, lets you change them. These are the same settings a wired MA controller edits as "function setting mode no." 01-28 and that an MHK1 thermostat shows as 101-128 in installer setup; code NNN is mode NNN-100.
+
+- Which units: ceiling cassettes, ducted and P-series units such as SLZ, SEZ, PLA and PVA report real values. Wall-mount MSZ units report every code as 0 and the page offers nothing to change; their function settings are only reachable from the handheld remote's service mode.
+- What 0 means: the unit does not have that function. An MHK1 hides those codes, which is why its installer setup skips numbers.
+- Names and option text come from Mitsubishi document 69-2426-01 (MHK1 kit installation manual) and the PAR-31MAA technical manual. What a function does can differ by model, so check your unit's installation manual before changing anything. Codes the unit reports but no manual identifies are shown read-only and cannot be changed from the page.
+- Applying a change does what an MHK1 does when it enters installer setup: read fresh, stop the unit if it is running, write, read back, and restart. It takes about ten seconds and the result page shows each change with the value read back from the unit.
+- Two settings worth knowing about: 124 "heating set temperature offset" makes the unit heat to about 4 C (7 F) above the set point to compensate for a ceiling-mounted sensor, which becomes overshoot when a remote room sensor is in use; 125 and 127 control what the fan does when the thermostat is satisfied in heat and cool mode.
+
+# Room temperature sensor
+Setup -> Unit has a "Room temperature sensor" setting:
+
+- Remote sensor via MQTT (default): temperatures published to topic/remote_temp/set are passed to the unit, and the unit reverts to its own sensor if no value arrives for five minutes. This is the previous behaviour.
+- Internal sensor: the unit always uses its own sensor. Messages on the remote temperature topic are ignored, and at every boot the firmware sends the unit a reset so a remote value left behind by a previous controller, such as an MHK1, is cleared.
+
+The state topic includes remoteTempActive (true/false) and the Status page shows which sensor is in use and, when remote, how long since the last value arrived.
+
+***
 For nodered fans MQTT topic use cases
 - topic/power/set OFF
 - topic/mode/set AUTO HEAT COOL DRY FAN_ONLY OFF ON
