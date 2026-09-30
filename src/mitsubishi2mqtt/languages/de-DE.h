@@ -119,6 +119,7 @@ const char txt_login_fail[] PROGMEM = "Falscher/s Benutzername/Passwort! Erneut 
 const char txt_upgrade_title[] PROGMEM = "Upgrade";
 const char txt_upgrade_info[] PROGMEM = "Firmware OTA upgrade, über .bin Datei upload";
 const char txt_upgrade_start[] PROGMEM = "Upload gestartet";
+const char txt_upgrade_build[] PROGMEM = "Current firmware";
 
 //Page Upload
 const char txt_upload_nofile[] PROGMEM = "keine Datei ausgewählt";

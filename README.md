@@ -61,7 +61,7 @@ For nodered fans MQTT topic use cases
 - topic/wideVane/set << < | > >>
 - topic/settings
 - topic/state (JSON; includes remoteTempActive true/false showing whether the unit is currently using a remote temperature)
-- topic/debug/packets
+- topic/debug/packets/<direction>/<type> (one subtopic per packet direction and type byte, subscribe to topic/debug/packets/# to see everything)
 - topic/debug/packets/set on off
 - topic/debug/logs
 - topic/debug/logs/set on off
