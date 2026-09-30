@@ -15,31 +15,41 @@
 */
 
 // Human-readable names for the indoor unit installer functions (codes 101-128)
-// that the HeatPump library reads with getFunctions(). Names and option text
-// come from the generic table in Mitsubishi document 69-2426-01 (MHK1 controller
-// kit installation manual, pages 6-7). What each function actually does is
-// model specific, so treat these as typical meanings and always show the raw code.
-// Codes not listed here are reported as "Function NNN" with the raw value only.
+// that the HeatPump library reads with getFunctions(). Code NNN is Mitsubishi
+// "function setting mode no." NNN-100 as used by wired MA controllers. Names and
+// option text come from the MHK1 controller kit installation manual (document
+// 69-2426-01, pages 6-7) and the PAR-31MAA technical manual (document TM-E0649,
+// function setting tables 1 and 2). What each function does is model specific,
+// so treat these as typical meanings and always show the raw code. Codes not
+// listed here are reported as "Function NNN" with the raw value only.
 
 const char fn_name_101[] PROGMEM = "Auto restart after power outage";
+const char fn_name_102[] PROGMEM = "Indoor temperature sensor (thermistor selection)";
 const char fn_name_103[] PROGMEM = "Ventilation air (LOSSNAY)";
 const char fn_name_104[] PROGMEM = "Power voltage";
 const char fn_name_105[] PROGMEM = "Auto energy-savings operation";
+const char fn_name_106[] PROGMEM = "Auto mode set point";
 const char fn_name_107[] PROGMEM = "Change filter duration";
 const char fn_name_108[] PROGMEM = "Auto fan speed setting";
 const char fn_name_109[] PROGMEM = "Number of air outlets (PLA only)";
 const char fn_name_110[] PROGMEM = "High performance filter installed";
 const char fn_name_111[] PROGMEM = "Airflow direction settings";
+const char fn_name_112[] PROGMEM = "i-see sensor mounting position";
+const char fn_name_113[] PROGMEM = "Humidifier installed (PVA)";
+const char fn_name_114[] PROGMEM = "Heating vane differential (cold draft prevention)";
 const char fn_name_115[] PROGMEM = "Indoor coil frost prevention temperature";
 const char fn_name_117[] PROGMEM = "Defrost control";
 const char fn_name_123[] PROGMEM = "Airflow oscillate mode";
-const char fn_name_124[] PROGMEM = "Heating mode temperature offset";
+const char fn_name_124[] PROGMEM = "Heating set temperature offset (4 deg up)";
 const char fn_name_125[] PROGMEM = "Thermal off fan operation (heat mode)";
 const char fn_name_127[] PROGMEM = "Thermal off fan operation (cool mode)";
 const char fn_name_128[] PROGMEM = "Display system error";
 
 const char fn_opt_101_1[] PROGMEM = "OFF";
 const char fn_opt_101_2[] PROGMEM = "ON";
+const char fn_opt_102_1[] PROGMEM = "Average of indoor units in operation";
+const char fn_opt_102_2[] PROGMEM = "Indoor unit connected to the controller";
+const char fn_opt_102_3[] PROGMEM = "Wired remote controller built-in sensor";
 const char fn_opt_103_1[] PROGMEM = "Not supported";
 const char fn_opt_103_2[] PROGMEM = "IDU does not intake outdoor air through LOSSNAY";
 const char fn_opt_103_3[] PROGMEM = "IDU intakes outdoor air through LOSSNAY";
@@ -47,6 +57,8 @@ const char fn_opt_104_1[] PROGMEM = "230V";
 const char fn_opt_104_2[] PROGMEM = "208V";
 const char fn_opt_105_1[] PROGMEM = "ON";
 const char fn_opt_105_2[] PROGMEM = "OFF";
+const char fn_opt_106_1[] PROGMEM = "Single set point";
+const char fn_opt_106_2[] PROGMEM = "Dual set point";
 const char fn_opt_107_1[] PROGMEM = "100 hours";
 const char fn_opt_107_2[] PROGMEM = "2500 hours";
 const char fn_opt_107_3[] PROGMEM = "OFF";
@@ -61,6 +73,14 @@ const char fn_opt_110_2[] PROGMEM = "YES";
 const char fn_opt_111_1[] PROGMEM = "No vanes (or vane #3 for PLA)";
 const char fn_opt_111_2[] PROGMEM = "Vane #1 setting";
 const char fn_opt_111_3[] PROGMEM = "Vane #2 setting";
+const char fn_opt_112_1[] PROGMEM = "Mounting position 1";
+const char fn_opt_112_2[] PROGMEM = "Mounting position 2";
+const char fn_opt_112_3[] PROGMEM = "Standard";
+const char fn_opt_113_1[] PROGMEM = "Not present";
+const char fn_opt_113_2[] PROGMEM = "Present";
+const char fn_opt_114_1[] PROGMEM = "Low (24-28 C pipe temp)";
+const char fn_opt_114_2[] PROGMEM = "Standard (28-32 C pipe temp)";
+const char fn_opt_114_3[] PROGMEM = "High (35-38 C pipe temp)";
 const char fn_opt_115_1[] PROGMEM = "36 F (2 C)";
 const char fn_opt_115_2[] PROGMEM = "37 F (3 C)";
 const char fn_opt_117_1[] PROGMEM = "Standard";
@@ -79,7 +99,7 @@ const char fn_opt_128_2[] PROGMEM = "OFF";
 
 // Shared fallbacks
 const char fn_opt_not_supported[] PROGMEM = "Not supported";
-const char fn_opt_not_reported[] PROGMEM = "not available on this model";
+const char fn_opt_not_reported[] PROGMEM = "Not supported";
 const char fn_opt_unknown[] PROGMEM = "";
 
 // Returns the manual's name for a function code, or nullptr when the manual
@@ -87,14 +107,19 @@ const char fn_opt_unknown[] PROGMEM = "";
 const char* functionName(int code) {
   switch (code) {
     case 101: return fn_name_101;
+    case 102: return fn_name_102;
     case 103: return fn_name_103;
     case 104: return fn_name_104;
     case 105: return fn_name_105;
+    case 106: return fn_name_106;
     case 107: return fn_name_107;
     case 108: return fn_name_108;
     case 109: return fn_name_109;
     case 110: return fn_name_110;
     case 111: return fn_name_111;
+    case 112: return fn_name_112;
+    case 113: return fn_name_113;
+    case 114: return fn_name_114;
     case 115: return fn_name_115;
     case 117: return fn_name_117;
     case 123: return fn_name_123;
@@ -117,14 +142,19 @@ const char* functionOption(int code, int value) {
   if (value < 1 || value > 3) return fn_opt_not_reported;
   switch (code) {
     case 101: return value == 1 ? fn_opt_101_1 : value == 2 ? fn_opt_101_2 : fn_opt_not_supported;
+    case 102: return value == 1 ? fn_opt_102_1 : value == 2 ? fn_opt_102_2 : fn_opt_102_3;
     case 103: return value == 1 ? fn_opt_103_1 : value == 2 ? fn_opt_103_2 : fn_opt_103_3;
     case 104: return value == 1 ? fn_opt_104_1 : value == 2 ? fn_opt_104_2 : fn_opt_not_supported;
     case 105: return value == 1 ? fn_opt_105_1 : value == 2 ? fn_opt_105_2 : fn_opt_not_supported;
+    case 106: return value == 1 ? fn_opt_106_1 : value == 2 ? fn_opt_106_2 : fn_opt_not_supported;
     case 107: return value == 1 ? fn_opt_107_1 : value == 2 ? fn_opt_107_2 : fn_opt_107_3;
     case 108: return value == 1 ? fn_opt_108_1 : value == 2 ? fn_opt_108_2 : fn_opt_108_3;
     case 109: return value == 1 ? fn_opt_109_1 : value == 2 ? fn_opt_109_2 : fn_opt_109_3;
     case 110: return value == 1 ? fn_opt_110_1 : value == 2 ? fn_opt_110_2 : fn_opt_not_supported;
     case 111: return value == 1 ? fn_opt_111_1 : value == 2 ? fn_opt_111_2 : fn_opt_111_3;
+    case 112: return value == 1 ? fn_opt_112_1 : value == 2 ? fn_opt_112_2 : fn_opt_112_3;
+    case 113: return value == 1 ? fn_opt_113_1 : value == 2 ? fn_opt_113_2 : fn_opt_not_supported;
+    case 114: return value == 1 ? fn_opt_114_1 : value == 2 ? fn_opt_114_2 : fn_opt_114_3;
     case 115: return value == 1 ? fn_opt_115_1 : value == 2 ? fn_opt_115_2 : fn_opt_not_supported;
     case 117: return value == 1 ? fn_opt_117_1 : value == 2 ? fn_opt_117_2 : fn_opt_not_supported;
     case 123: return value == 1 ? fn_opt_123_1 : value == 2 ? fn_opt_123_2 : fn_opt_not_supported;

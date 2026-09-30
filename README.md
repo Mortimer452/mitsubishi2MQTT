@@ -9,7 +9,7 @@ Features:
  - Homeassistant autodiscovery and control with MQTT
  - Control with MQTT
  - Multilanguages
- - Read-only view of the indoor unit installer function settings (codes 101-128, Setup -> Functions)
+ - View and change the indoor unit installer function settings (codes 101-128, Setup -> Functions). Only functions the unit reports are editable; applying a change stops the unit for a few seconds and restarts it, as an MHK1 does. Wall-mount MSZ units report no functions over CN105.
 
 Screenshots:
 
