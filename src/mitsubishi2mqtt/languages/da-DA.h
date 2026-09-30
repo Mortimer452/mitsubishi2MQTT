@@ -158,3 +158,18 @@ const char txt_f_remote[] PROGMEM = "Remote sensor via MQTT";
 const char txt_f_internal[] PROGMEM = "Internal sensor";
 const char txt_status_sensor[] PROGMEM = "Room temperature source";
 const char txt_status_lastfeed[] PROGMEM = "last update";
+
+//Page Functions (write)
+const char txt_fn_apply[] PROGMEM = "Apply changes";
+const char txt_fn_confirm[] PROGMEM = "Apply the changed functions? The unit is stopped for a few seconds and then restarted.";
+const char txt_fn_no_changes[] PROGMEM = "No changes to apply";
+const char txt_fn_result[] PROGMEM = "Result";
+const char txt_fn_written[] PROGMEM = "Written";
+const char txt_fn_readback[] PROGMEM = "Read back";
+const char txt_fn_ok[] PROGMEM = "OK";
+const char txt_fn_mismatch[] PROGMEM = "MISMATCH";
+const char txt_fn_write_rejected[] PROGMEM = "The write was rejected because the function data was incomplete. Nothing was sent.";
+const char txt_fn_power_note[] PROGMEM = "The unit was stopped for the write and restarted.";
+const char txt_fn_power_failed[] PROGMEM = "The unit did not acknowledge the power change.";
+const char txt_fn_reload[] PROGMEM = "Back to functions";
+const char txt_fn_readonly[] PROGMEM = "unknown function, read only";

@@ -1028,9 +1028,27 @@ void handleControl() {
   //delay(100);
 }
 
-// Renders the indoor unit installer functions (codes 101-128) as a read-only
-// table. Reads fresh from the unit on every request and never writes.
-String functionsTable(heatpumpFunctions &functions) {
+// Fills codes[] with the function codes the unit reports, ascending, and
+// returns how many there are. The unit lists them in packet order (101-106,
+// 115-122, then 107-114, 123-128), which reads oddly on a page.
+int sortedFunctionCodes(heatpumpFunctions &functions, int codes[]) {
+  heatpumpFunctionCodes all = functions.getAllCodes();
+  int n = 0;
+  for (int i = 0; i < MAX_FUNCTION_CODE_COUNT; ++i) {
+    if (!all.valid[i]) continue;
+    int code = all.code[i];
+    int j = n;
+    while (j > 0 && codes[j - 1] > code) { codes[j] = codes[j - 1]; --j; }
+    codes[j] = code;
+    n++;
+  }
+  return n;
+}
+
+// Renders the indoor unit installer functions (codes 101-128) as a table.
+// Rows the unit reports with a value 1-3 get a select named f<code>; rows at 0
+// are shown read-only. Sets editable when at least one row has a select.
+String functionsTable(heatpumpFunctions &functions, bool &editable) {
   String table = F("<table style='width:100%'><tr><th>");
   table += FPSTR(txt_fn_code);
   table += F("</th><th>");
@@ -1039,15 +1057,17 @@ String functionsTable(heatpumpFunctions &functions) {
   table += FPSTR(txt_fn_value);
   table += F("</th></tr>");
 
-  heatpumpFunctionCodes codes = functions.getAllCodes();
+  int codes[MAX_FUNCTION_CODE_COUNT];
+  int count = sortedFunctionCodes(functions, codes);
   bool anyValue = false;
-  for (int i = 0; i < MAX_FUNCTION_CODE_COUNT; ++i) {
-    if (!codes.valid[i]) continue;
-    int code = codes.code[i];
+  bool anyEditable = false;
+  for (int i = 0; i < count; ++i) {
+    int code = codes[i];
     int value = functions.getValue(code);
     if (value > 0) anyValue = true;
     const char* name = functionName(code);
     const char* option = functionOption(code, value);
+    if (value >= 1 && value <= 3 && name != nullptr) anyEditable = true;
 
     table += F("<tr><td>");
     table += String(code);
@@ -1059,14 +1079,43 @@ String functionsTable(heatpumpFunctions &functions) {
       table += String(code);
     }
     table += F("</td><td>");
-    table += String(value);
-    if (strlen_P(option) > 0) {
-      table += F(" - ");
-      table += FPSTR(option);
+    if (value >= 1 && value <= 3 && name == nullptr) {
+      // The unit has this function but no manual we have names it. Show it,
+      // never offer to change it.
+      table += String(value);
+      table += F(" (");
+      table += FPSTR(txt_fn_readonly);
+      table += F(")");
+    } else if (value >= 1 && value <= 3) {
+      table += F("<select name='f");
+      table += String(code);
+      table += F("'>");
+      for (int v = 1; v <= 3; ++v) {
+        table += F("<option value='");
+        table += String(v);
+        table += F("'");
+        if (v == value) table += F(" selected");
+        table += F(">");
+        table += String(v);
+        const char* text = functionOption(code, v);
+        if (strlen_P(text) > 0) {
+          table += F(" - ");
+          table += FPSTR(text);
+        }
+        table += F("</option>");
+      }
+      table += F("</select>");
+    } else {
+      table += String(value);
+      if (strlen_P(option) > 0) {
+        table += F(" - ");
+        table += FPSTR(option);
+      }
     }
     table += F("</td></tr>");
   }
   table += F("</table>");
+  editable = anyEditable;
   if (!anyValue) {
     table += F("<p><i>");
     table += FPSTR(txt_fn_no_values);
@@ -1090,6 +1139,118 @@ String functionsTable(heatpumpFunctions &functions) {
   return table;
 }
 
+// Applies submitted function changes. Sequence, mirroring what an MHK1 does
+// when it enters installer setup: read fresh, apply only the codes that
+// changed, stop the unit if it is running, write, read back, restart.
+// Returns the HTML for the result page.
+String applyFunctions() {
+  String out;
+  heatpumpFunctions fresh = hp.getFunctions();
+  if (!fresh.isValid()) {
+    out = F("<p>");
+    out += FPSTR(txt_fn_read_failed);
+    out += F("</p>");
+    return out;
+  }
+
+  int changedCode[MAX_FUNCTION_CODE_COUNT];
+  int changedFrom[MAX_FUNCTION_CODE_COUNT];
+  int changedTo[MAX_FUNCTION_CODE_COUNT];
+  int changes = 0;
+  int codes[MAX_FUNCTION_CODE_COUNT];
+  int count = sortedFunctionCodes(fresh, codes);
+  for (int i = 0; i < count; ++i) {
+    int code = codes[i];
+    int current = fresh.getValue(code);
+    if (current < 1 || current > 3) continue; // not available on this unit, never written
+    if (functionName(code) == nullptr) continue; // unknown meaning, never written
+    String arg = "f" + String(code);
+    if (!server.hasArg(arg)) continue;
+    int wanted = server.arg(arg).toInt();
+    if (wanted < 1 || wanted > 3 || wanted == current) continue;
+    if (fresh.setValue(code, wanted)) {
+      changedCode[changes] = code;
+      changedFrom[changes] = current;
+      changedTo[changes] = wanted;
+      changes++;
+    }
+  }
+  if (changes == 0) {
+    out = F("<p>");
+    out += FPSTR(txt_fn_no_changes);
+    out += F("</p>");
+    return out;
+  }
+
+  bool wasOn = hp.getPowerSettingBool();
+  bool stopped = true;
+  if (wasOn) {
+    hp.setPowerSetting(false);
+    stopped = hp.update();
+  }
+  bool written = hp.setFunctions(fresh);
+  heatpumpFunctions after = hp.getFunctions();
+  bool restarted = true;
+  if (wasOn) {
+    hp.setPowerSetting(true);
+    restarted = hp.update();
+  }
+
+  out = F("<p><b>");
+  out += FPSTR(txt_fn_result);
+  out += F("</b></p><table style='width:100%'><tr><th>");
+  out += FPSTR(txt_fn_code);
+  out += F("</th><th>");
+  out += FPSTR(txt_fn_name);
+  out += F("</th><th>");
+  out += FPSTR(txt_fn_written);
+  out += F("</th><th>");
+  out += FPSTR(txt_fn_readback);
+  out += F("</th></tr>");
+  for (int i = 0; i < changes; ++i) {
+    int code = changedCode[i];
+    int readback = after.isValid() ? after.getValue(code) : 0;
+    const char* name = functionName(code);
+    out += F("<tr><td>");
+    out += String(code);
+    out += F("</td><td>");
+    if (name != nullptr) out += FPSTR(name); else { out += F("Function "); out += String(code); }
+    out += F("</td><td>");
+    out += String(changedFrom[i]);
+    out += F(" &rarr; ");
+    out += String(changedTo[i]);
+    out += F("</td><td>");
+    out += String(readback);
+    if (readback == changedTo[i]) {
+      out += F(" <span style='color:#47c266'><b>");
+      out += FPSTR(txt_fn_ok);
+    } else {
+      out += F(" <span style='color:#d43535'><b>");
+      out += FPSTR(txt_fn_mismatch);
+    }
+    out += F("</b></span></td></tr>");
+  }
+  out += F("</table>");
+  if (!written) {
+    out += F("<p><i>");
+    out += FPSTR(txt_fn_write_rejected);
+    out += F("</i></p>");
+  }
+  if (wasOn) {
+    out += F("<p><i>");
+    out += FPSTR(txt_fn_power_note);
+    if (!stopped || !restarted) {
+      out += F(" ");
+      out += FPSTR(txt_fn_power_failed);
+    }
+    out += F("</i></p>");
+  }
+  out += F("<p><a class='button' href='/functions'>");
+  out += FPSTR(txt_fn_reload);
+  out += F("</a></p>");
+  return out;
+}
+
 void handleFunctions() {
   if (!checkLogin()) return;
 
@@ -1102,6 +1263,8 @@ void handleFunctions() {
     body = F("<p>");
     body += FPSTR(txt_fn_not_connected);
     body += F("</p>");
+  } else if (server.method() == HTTP_POST) {
+    body = applyFunctions();
   } else {
     heatpumpFunctions functions = hp.getFunctions();
     if (!functions.isValid()) {
@@ -1111,7 +1274,19 @@ void handleFunctions() {
       body += FPSTR(txt_fn_retry);
       body += F("</a></p>");
     } else {
-      body = functionsTable(functions);
+      bool editable = false;
+      String table = functionsTable(functions, editable);
+      if (editable) {
+        body = F("<form method='post' onsubmit=\"return confirm('");
+        body += FPSTR(txt_fn_confirm);
+        body += F("');\">");
+        body += table;
+        body += F("<p><button type='submit' class='button bgrn'>");
+        body += FPSTR(txt_fn_apply);
+        body += F("</button></p></form>");
+      } else {
+        body = table;
+      }
     }
   }
   functionsPage.replace(F("_FUNCTIONS_BODY_"), body);
